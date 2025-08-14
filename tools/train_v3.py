@@ -257,6 +257,9 @@ def main():
     args = parse_args()
     update_config(cfg, args)
     
+    # Make config mutable to allow updates
+    cfg.defrost()
+    
     # Update config with dataset paths
     if args.data_root:
         cfg.DATASET.DATAROOT = args.data_root
@@ -278,6 +281,9 @@ def main():
         cfg.TRAIN.BATCH_SIZE_PER_GPU = args.batch_size
     if args.epochs:
         cfg.TRAIN.END_EPOCH = args.epochs
+    
+    # Freeze config after updates
+    cfg.freeze()
     
     # Set single class mode
     if args.single_cls:
