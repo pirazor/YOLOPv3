@@ -35,6 +35,7 @@ from lib.core.loss import get_loss
 from lib.core.function import validate
 from lib.core.general import fitness
 from lib.models import get_net
+from lib.models.common import ImplicitM
 from lib.utils import is_parallel
 from lib.utils.utils import create_logger, select_device
 
@@ -340,11 +341,20 @@ def main():
     detector_idx = model.detector_index
     if detector_idx >= 0:
         detector = model.model[detector_idx]
+        old_nc = detector.nc
         detector.nc = num_classes
         detector.no = num_classes + 5
-        # Reinitialize detection convolutions
-        for i, ch in enumerate(detector.ch):
-            detector.m[i] = nn.Conv2d(ch, detector.no * detector.na, 1).to(device)
+        
+        # Reinitialize detection convolutions if number of classes changed
+        if old_nc != num_classes:
+            # Get input channels from existing conv layers
+            ch = [m.in_channels for m in detector.m]
+            # Reinitialize detection convolutions with new number of outputs
+            detector.m = nn.ModuleList(nn.Conv2d(x, detector.no * detector.na, 1) for x in ch)
+            detector.m = detector.m.to(device)
+            # Also reinitialize ImplicitM modules for new output size
+            detector.im = nn.ModuleList(ImplicitM(detector.no * detector.na) for _ in ch)
+            detector.im = detector.im.to(device)
     
     # Define loss and optimizer
     criterion = get_loss(cfg, device=device)
